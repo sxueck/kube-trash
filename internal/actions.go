@@ -3,13 +3,14 @@ package internal
 import (
 	"context"
 	"fmt"
+	"github.com/sxueck/kube-trash/config"
 	"gopkg.in/yaml.v3"
+	"k8s.io/client-go/util/workqueue"
 	"log"
 	"sync"
 	"time"
 
 	"github.com/sxueck/kube-trash/internal/cluster"
-	"github.com/sxueck/kube-trash/pkg/queue"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +31,7 @@ const (
 )
 
 // ServResourcesInformer Reduce the impact on API servers by controlling the number of concurrent queries
-func ServResourcesInformer(client cluster.ClientSet, asyncQueue *queue.Queue) error {
+func ServResourcesInformer(client cluster.ClientSet, asyncQueue workqueue.RateLimitingInterface) error {
 	ctx, cancel := context.WithTimeout(context.Background(), informerTimeout)
 	defer cancel()
 
@@ -88,7 +89,7 @@ func ServResourcesInformer(client cluster.ClientSet, asyncQueue *queue.Queue) er
 
 // runInformer Runs informer for the specified resource
 // Here you need to pass in a queue for asynchronous processing, to avoid the process of blocking the cluster due to i/o problems
-func runInformer(ctx context.Context, dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, asyncQueue *queue.Queue) error {
+func runInformer(ctx context.Context, dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, asyncQueue workqueue.RateLimitingInterface) error {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("Recovered from panic in informer for %s: %v", gvr.String(), r)
@@ -105,7 +106,7 @@ func runInformer(ctx context.Context, dynamicClient dynamic.Interface, gvr schem
 			DeleteFunc: func(obj interface{}) {
 				u := ExtractAboutKeyInformation(obj)
 				log.Printf("Delete %s %s %s\n", u.Namespace, u.Kind, u.Name)
-				asyncQueue.Enqueue(*u)
+				asyncQueue.Add(u)
 			},
 		})
 		return err
@@ -199,7 +200,7 @@ func interfaceToYAML(obj interface{}) ([]byte, error) {
 	return yamlData, nil
 }
 
-func ExtractAboutKeyInformation(obj interface{}) *queue.Item {
+func ExtractAboutKeyInformation(obj interface{}) *config.QueueItem {
 	unstructuredObj, ok := obj.(*unstructured.Unstructured)
 	if !ok {
 		log.Printf("Invalid object type, expected *unstructured.Unstructured, got %T", obj)
@@ -212,7 +213,7 @@ func ExtractAboutKeyInformation(obj interface{}) *queue.Item {
 		return nil
 	}
 
-	return &queue.Item{
+	return &config.QueueItem{
 		Name:      unstructuredObj.GetName(),
 		Namespace: unstructuredObj.GetNamespace(),
 		Kind:      unstructuredObj.GetKind(),

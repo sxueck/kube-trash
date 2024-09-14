@@ -8,6 +8,14 @@ import (
 	"github.com/spf13/viper"
 )
 
+// QueueItem represents an item in the queue
+type QueueItem struct {
+	Data      []byte
+	Kind      string
+	Name      string
+	Namespace string
+}
+
 type Cfg struct {
 	APIServer  string      `mapstructure:"api_server"`
 	KubeConfig string      `mapstructure:"kube_config"`
