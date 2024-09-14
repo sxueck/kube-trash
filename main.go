@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/sxueck/kube-record/cmd"
+	"github.com/sxueck/kube-trash/cmd"
 	"log"
 )
 

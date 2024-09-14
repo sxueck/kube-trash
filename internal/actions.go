@@ -3,13 +3,14 @@ package internal
 import (
 	"context"
 	"fmt"
-	"github.com/sxueck/kube-record/pkg/queue"
 	"gopkg.in/yaml.v3"
 	"log"
 	"sync"
 	"time"
 
-	"github.com/sxueck/kube-record/internal/cluster"
+	"github.com/sxueck/kube-trash/internal/cluster"
+	"github.com/sxueck/kube-trash/pkg/queue"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -72,8 +73,6 @@ func ServResourcesInformer(client cluster.ClientSet, asyncQueue *queue.Queue) er
 				semaphore <- struct{}{}        // Acquire semaphore
 				defer func() { <-semaphore }() // Release semaphore
 
-				// TODO: Here is an Informer of a resource to create a new queue
-				//  if there are too many resource types in the cluster may cause some performance issues (wait to optimize this part)
 				if err := runInformer(ctx, client.DynamicClient, gvr, asyncQueue); err != nil {
 					if !errors.IsNotFound(err) {
 						log.Printf("Error running informer for %s: %v", gvr.String(), err)
@@ -104,8 +103,9 @@ func runInformer(ctx context.Context, dynamicClient dynamic.Interface, gvr schem
 		informer = createDynamicInformer(dynamicClient, gvr)
 		_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 			DeleteFunc: func(obj interface{}) {
-				//log.Printf("Delete %s\n", yamlContext)
-				asyncQueue.Enqueue(*ExtractAboutKeyInformation(obj))
+				u := ExtractAboutKeyInformation(obj)
+				log.Printf("Delete %s %s %s\n", u.Namespace, u.Kind, u.Name)
+				asyncQueue.Enqueue(*u)
 			},
 		})
 		return err
@@ -155,9 +155,10 @@ func createDynamicInformer(dynamicClient dynamic.Interface, gvr schema.GroupVers
 	)
 }
 
+// TODO: Optimize to the configuration file
 func shouldSkipResource(apiResource v1.APIResource) bool {
 	switch apiResource.Name {
-	case "events", "endpoints":
+	case "events", "endpoints", "pods":
 		return true
 	}
 	return false
@@ -168,6 +169,33 @@ func interfaceToYAML(obj interface{}) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal object to YAML: %w", err)
 	}
+
+	// Here to add a layer of processing logic, because unstructured.
+	// Unstructured is the root of "object" key, input here general YAML formats reflection to remove the root keys
+	/* like
+	object:
+		apiVersion: v1
+		kind: Pod
+		metadata:
+		creationTimestamp: "2024-09-13T06:44:02Z"
+		deletionGracePeriodSeconds: 0
+	*/
+	var rawData map[string]interface{}
+	if err = yaml.Unmarshal(yamlData, &rawData); err != nil {
+		log.Printf("Error unmarshalling data: %v", err)
+		return yamlData, nil
+	}
+
+	if obj, exists := rawData["object"]; exists {
+		objData, err := yaml.Marshal(obj)
+		if err != nil {
+			log.Printf("Error marshalling object data: %v", err)
+			return yamlData, nil
+		}
+		return objData, nil
+	}
+
+	log.Println("'object' field does not exist in the data")
 	return yamlData, nil
 }
 

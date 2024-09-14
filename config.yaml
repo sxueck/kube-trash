@@ -1,5 +1,6 @@
 storage: # Compatible with S3 API
-  endpoint: http://127.0.0.1
+  endpoint: 127.0.0.1
   port: 9000
   access_key_id: admin
   secret_access_key: minio_password
+  bucket: kube-trash

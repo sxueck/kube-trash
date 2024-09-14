@@ -7,11 +7,11 @@ import (
 	"log"
 	"time"
 
-	"github.com/sxueck/kube-record/config"
-	"github.com/sxueck/kube-record/internal"
-	"github.com/sxueck/kube-record/internal/cluster"
-	"github.com/sxueck/kube-record/pkg/queue"
-	"github.com/sxueck/kube-record/pkg/storage"
+	"github.com/sxueck/kube-trash/config"
+	"github.com/sxueck/kube-trash/internal"
+	"github.com/sxueck/kube-trash/internal/cluster"
+	"github.com/sxueck/kube-trash/pkg/queue"
+	"github.com/sxueck/kube-trash/pkg/storage"
 )
 
 func Run() error {
@@ -34,7 +34,7 @@ func Run() error {
 
 	asyncQueue := queue.NewQueue()
 
-	minioConfig := config.GlobalCfg.MinioConfig
+	minioConfig := config.GlobalCfg.Storage
 	minioStorage, err := storage.NewMinioStorage(minioConfig)
 	if err != nil {
 		return err
@@ -63,12 +63,13 @@ func processQueue(q *queue.Queue, minio *storage.MinioStorage) {
 	for {
 		item, ok := q.Dequeue()
 		if !ok {
-			time.Sleep(time.Second * 60) // 如果队列为空，等待一秒
+			time.Sleep(time.Second * 40)
 			continue
 		}
 
 		// Use MinIO to store files
 		ctx := context.Background()
+		log.Printf("Processing item: %+v", item.Name)
 		objectName := GenMinioCompleteObjectName(item.Namespace, item.Name, item.Kind)
 		err := minio.Upload(ctx,
 			objectName,
@@ -83,5 +84,5 @@ func processQueue(q *queue.Queue, minio *storage.MinioStorage) {
 }
 
 func GenMinioCompleteObjectName(namespace, name, kind string) string {
-	return fmt.Sprintf("%s/%s_%s_%s", namespace, name, kind, time.Now().Format("2006-01-02_15-04-05"))
+	return fmt.Sprintf("%s/%s_%s_%s.yaml", namespace, name, kind, time.Now().Format("2006-01-02_150405"))
 }

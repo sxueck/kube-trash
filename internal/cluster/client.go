@@ -2,11 +2,10 @@ package cluster
 
 import (
 	"fmt"
-	"github.com/sxueck/kube-record/pkg/utils"
+	"github.com/sxueck/kube-trash/config"
+	"github.com/sxueck/kube-trash/pkg/utils"
 	"k8s.io/client-go/discovery"
 	"log"
-
-	. "github.com/sxueck/kube-record/config"
 
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -38,8 +37,8 @@ func NewClientConfig() (*rest.Config, error) {
 		err        error
 	)
 
-	apiServer := GlobalCfg.APIServer
-	kubeConfigPath := GlobalCfg.KubeConfig
+	apiServer := config.GlobalCfg.APIServer
+	kubeConfigPath := config.GlobalCfg.KubeConfig
 
 	if len(apiServer) == 0 && len(kubeConfigPath) > 0 {
 		if err = utils.FileExistsAndReadable(kubeConfigPath); err != nil {

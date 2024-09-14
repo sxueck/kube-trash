@@ -8,7 +8,7 @@ import (
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"github.com/sxueck/kube-record/config"
+	"github.com/sxueck/kube-trash/config"
 )
 
 type MinioStorage struct {
@@ -17,8 +17,8 @@ type MinioStorage struct {
 }
 
 func NewMinioStorage(cfg config.MinioConfig) (*MinioStorage, error) {
-	minioClient, err := minio.New(cfg.Endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
+	minioClient, err := minio.New(fmt.Sprintf("%s:%d", cfg.Endpoint, cfg.Port), &minio.Options{
+		Creds:  credentials.NewStaticV4(cfg.AccessKeyID, cfg.SecretAccessKey, ""),
 		Secure: false, // Set to true if HTTPS is used
 	})
 	if err != nil {
@@ -32,7 +32,7 @@ func NewMinioStorage(cfg config.MinioConfig) (*MinioStorage, error) {
 }
 
 func (s *MinioStorage) Upload(ctx context.Context, objectName string, reader io.Reader, objectSize int64) error {
-	_, err := s.client.PutObject(ctx, s.bucket, objectName, reader, objectSize, minio.PutObjectOptions{ContentType: "application/octet-stream"})
+	_, err := s.client.PutObject(ctx, s.bucket, objectName, reader, objectSize, minio.PutObjectOptions{ContentType: "application/yaml"})
 	if err != nil {
 		return fmt.Errorf("failed to upload object: %v", err)
 	}

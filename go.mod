@@ -1,4 +1,4 @@
-module github.com/sxueck/kube-record
+module github.com/sxueck/kube-trash
 
 go 1.22.4
 
