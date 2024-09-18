@@ -4,3 +4,13 @@ storage: # Compatible with S3 API
   access_key_id: admin
   secret_access_key: minio_password
   bucket: kube-trash
+watch:
+  # Be cautious of overwriting scenarios.
+  # For instance : if you specify "pods" in both exclude and include, the priority of exclude will override include.
+  exclude_resource:
+    - events
+    - endpoints
+    - pods
+    - replicasets
+  include_resource:
+    - '*'

@@ -8,6 +8,7 @@ import (
 	"github.com/sxueck/kube-trash/internal"
 	"github.com/sxueck/kube-trash/internal/cluster"
 	"github.com/sxueck/kube-trash/pkg/storage"
+
 	"golang.org/x/sys/unix"
 	"k8s.io/client-go/util/workqueue"
 	"log"
@@ -56,8 +57,8 @@ func Run(ctx context.Context) error {
 
 	asyncQueue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 
-	minioConfig := config.GlobalCfg.Storage
-	minioStorage, err := storage.NewMinioStorage(minioConfig)
+	storageConfig := config.GlobalCfg.Storage
+	storageStorage, err := storage.NewS3Storage(storageConfig)
 	if err != nil {
 		return err
 	}
@@ -76,43 +77,43 @@ func Run(ctx context.Context) error {
 
 	// Start polling for items in the queue
 	// Note: that go routines are independent of the stack, so they are not affected by the function lifecycle
-	go processQueue(ctx, asyncQueue, minioStorage)
+	go processQueue(ctx, asyncQueue, storageStorage)
 	return nil
 }
 
-func processQueue(ctx context.Context, q workqueue.RateLimitingInterface, minio *storage.MinioStorage) {
-    for {
-        select {
-        case <-ctx.Done():
-            log.Println("Shutting down the queue due to context cancellation")
-            return
-        default:
-            element, shutdown := q.Get()
-            if shutdown {
-                log.Println("Shutting down the queue")
-                return
-            }
+func processQueue(ctx context.Context, q workqueue.RateLimitingInterface, minio *storage.S3Storage) {
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("Shutting down the queue due to context cancellation")
+			return
+		default:
+			element, shutdown := q.Get()
+			if shutdown {
+				log.Println("Shutting down the queue")
+				return
+			}
 
-            item, ok := element.(*config.QueueItem)
-            if !ok {
-                log.Printf("Invalid element type, expected config.QueueItem, got %T", element)
-                q.Done(element)
-                continue
-            }
-            // Use s3 to store files
-            log.Printf("Processing item: %+v", item.Name)
-            objectName := GenMinioCompleteObjectName(item.Namespace, item.Name, item.Kind)
-            err := minio.Upload(ctx,
-                objectName,
-                bytes.NewReader(item.Data),
-                int64(len(item.Data)))
-            if err != nil {
-                log.Printf("Error uploading to MinIO: %v", err)
-            } else {
-                log.Printf("Successfully uploaded %s to MinIO", objectName)
-            }
-        }
-    }
+			item, ok := element.(*config.QueueItem)
+			if !ok {
+				log.Printf("Invalid element type, expected config.QueueItem, got %T", element)
+				q.Done(element)
+				continue
+			}
+			// Use s3 to store files
+			log.Printf("Processing item: %+v", item.Name)
+			objectName := GenMinioCompleteObjectName(item.Namespace, item.Name, item.Kind)
+			err := minio.Upload(ctx,
+				objectName,
+				bytes.NewReader(item.Data),
+				int64(len(item.Data)))
+			if err != nil {
+				log.Printf("Error uploading to storage: %v", err)
+			} else {
+				log.Printf("Successfully uploaded %s to storage", objectName)
+			}
+		}
+	}
 }
 
 func GenMinioCompleteObjectName(namespace, name, kind string) string {

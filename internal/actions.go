@@ -54,7 +54,7 @@ func ServResourcesInformer(client cluster.ClientSet, asyncQueue workqueue.RateLi
 		}
 
 		for _, apiResource := range resource.APIResources {
-			if shouldSkipResource(apiResource) {
+			if filterSkipResource(apiResource) {
 				continue
 			}
 
@@ -156,13 +156,33 @@ func createDynamicInformer(dynamicClient dynamic.Interface, gvr schema.GroupVers
 	)
 }
 
-// TODO: Optimize to the configuration file
-func shouldSkipResource(apiResource v1.APIResource) bool {
-	switch apiResource.Name {
-	case "events", "endpoints", "pods":
-		return true
+func filterSkipResource(apiResource v1.APIResource) bool {
+	excludeResources := config.GlobalCfg.Watch.ExcludeResource
+	includeResources := config.GlobalCfg.Watch.IncludeResource
+
+	// highest priority decision
+	for _, resource := range excludeResources {
+		if apiResource.Name == resource {
+			return true
+		}
 	}
-	return false
+
+	// secondary priority decision
+	for _, resource := range includeResources {
+		if apiResource.Name == resource {
+			return false
+		}
+	}
+
+	// If includeResources contains "*", do not skip any resources
+	for _, resource := range includeResources {
+		if resource == "*" {
+			return false
+		}
+	}
+
+	// if is not specified it is skipped by default
+	return true
 }
 
 func interfaceToYAML(obj interface{}) ([]byte, error) {
