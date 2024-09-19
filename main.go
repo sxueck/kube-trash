@@ -4,17 +4,17 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/sxueck/kube-trash/config"
-	"github.com/sxueck/kube-trash/internal"
-	"github.com/sxueck/kube-trash/internal/cluster"
-	"github.com/sxueck/kube-trash/pkg/storage"
-
-	"golang.org/x/sys/unix"
-	"k8s.io/client-go/util/workqueue"
 	"log"
 	"os"
 	"os/signal"
 	"time"
+
+	"github.com/sxueck/kube-trash/config"
+	"github.com/sxueck/kube-trash/internal"
+	"github.com/sxueck/kube-trash/internal/cluster"
+	"github.com/sxueck/kube-trash/pkg/storage"
+	"golang.org/x/sys/unix"
+	"k8s.io/client-go/util/workqueue"
 )
 
 func main() {
@@ -38,6 +38,7 @@ func main() {
 }
 
 func Run(ctx context.Context) error {
+	errChan := make(chan error, 1)
 	restConfig, err := cluster.NewClientConfig()
 	if err != nil {
 		log.Fatal(err)
@@ -58,30 +59,36 @@ func Run(ctx context.Context) error {
 	asyncQueue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 
 	storageConfig := config.GlobalCfg.Storage
-	storageStorage, err := storage.NewS3Storage(storageConfig)
+	s3, err := storage.NewS3Storage(storageConfig)
 	if err != nil {
 		return err
 	}
 
 	// Start Resource Monitoring
-	go func() {
-		err := internal.ServResourcesInformer(cluster.ClientSet{
+	go func(errChan chan<- error) {
+		err = internal.ServResourcesInformer(cluster.ClientSet{
 			BaseClient:      clientSet,
 			DiscoveryClient: discoveryClient,
 			DynamicClient:   dynamicClient,
 		}, asyncQueue)
 		if err != nil {
-			log.Printf("Error in ServResourcesInformer: %v", err)
+			errChan <- fmt.Errorf("error in ServResourcesInformer: %v", err)
 		}
-	}()
+	}(errChan)
 
 	// Start polling for items in the queue
 	// Note: that go routines are independent of the stack, so they are not affected by the function lifecycle
-	go processQueue(ctx, asyncQueue, storageStorage)
-	return nil
+	go processQueue(ctx, asyncQueue, s3)
+
+	select {
+	case err = <-errChan:
+		return err
+	case <-ctx.Done():
+		return nil
+	}
 }
 
-func processQueue(ctx context.Context, q workqueue.RateLimitingInterface, minio *storage.S3Storage) {
+func processQueue(ctx context.Context, q workqueue.RateLimitingInterface, s3 *storage.S3Storage) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -103,7 +110,7 @@ func processQueue(ctx context.Context, q workqueue.RateLimitingInterface, minio 
 			// Use s3 to store files
 			log.Printf("Processing item: %+v", item.Name)
 			objectName := GenMinioCompleteObjectName(item.Namespace, item.Name, item.Kind)
-			err := minio.Upload(ctx,
+			err := s3.Upload(ctx,
 				objectName,
 				bytes.NewReader(item.Data),
 				int64(len(item.Data)))

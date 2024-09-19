@@ -35,4 +35,4 @@ $ curl -O http://127.0.0.1:9000/browser/kube-trash/default%2Fnginx-deployment_De
 ```
 
 ## Note
-If you encounter errors like Failed to watch *unstructured.Unstructured in the logs, you can ignore them. Many resources do not define their Kind according to the standard, but this does not affect our processing logic.
+If you encounter errors like `Failed to watch *unstructured.Unstructured` in the logs, you can ignore them. Many resources do not define their Kind according to the standard, but this does not affect our processing logic.

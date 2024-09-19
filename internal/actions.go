@@ -4,14 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/sxueck/kube-trash/config"
-	"gopkg.in/yaml.v3"
-	"k8s.io/client-go/util/workqueue"
-	"log"
-	"sync"
-	"time"
-
 	"github.com/sxueck/kube-trash/internal/cluster"
-
+	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -22,6 +16,10 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/client-go/util/workqueue"
+	"log"
+	"sync"
+	"time"
 )
 
 const (
