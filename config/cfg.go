@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"log"
 	"os"
 
@@ -57,5 +56,4 @@ func InitConfig() {
 	}
 
 	GlobalCfg.KubeConfig = os.Getenv("KR_KUBECONFIG")
-	fmt.Printf("%+v\n", GlobalCfg)
 }

@@ -3,6 +3,11 @@ package internal
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
+
+	log "github.com/sirupsen/logrus"
+
 	"github.com/sxueck/kube-trash/config"
 	"github.com/sxueck/kube-trash/internal/cluster"
 	"gopkg.in/yaml.v3"
@@ -17,9 +22,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
-	"log"
-	"sync"
-	"time"
 )
 
 const (
@@ -47,7 +49,7 @@ func ServResourcesInformer(client cluster.ClientSet, asyncQueue workqueue.RateLi
 	for _, resource := range resourceList {
 		gv, err := schema.ParseGroupVersion(resource.GroupVersion)
 		if err != nil {
-			log.Printf("failed to parse group version: %s", err)
+			log.Warnf("failed to parse group version: %s", err)
 			continue
 		}
 
@@ -62,7 +64,7 @@ func ServResourcesInformer(client cluster.ClientSet, asyncQueue workqueue.RateLi
 				Kind:    apiResource.Kind,
 			})
 			if err != nil {
-				log.Printf("Error converting GVK to GVR: %v", err)
+				log.Warnf("Error converting GVK to GVR: %v", err)
 				continue
 			}
 
@@ -74,7 +76,7 @@ func ServResourcesInformer(client cluster.ClientSet, asyncQueue workqueue.RateLi
 
 				if err := runInformer(ctx, client.DynamicClient, gvr, asyncQueue); err != nil {
 					if !errors.IsNotFound(err) {
-						log.Printf("Error running informer for %s: %v", gvr.String(), err)
+						log.Warnf("Error running informer for %s: %v", gvr.String(), err)
 					}
 				}
 			}(gvr)
@@ -90,7 +92,7 @@ func ServResourcesInformer(client cluster.ClientSet, asyncQueue workqueue.RateLi
 func runInformer(ctx context.Context, dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, asyncQueue workqueue.RateLimitingInterface) error {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("Recovered from panic in informer for %s: %v", gvr.String(), r)
+			log.Warnf("Recovered from panic in informer for %s: %v", gvr.String(), r)
 		}
 	}()
 
@@ -103,7 +105,7 @@ func runInformer(ctx context.Context, dynamicClient dynamic.Interface, gvr schem
 		_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 			DeleteFunc: func(obj interface{}) {
 				u := ExtractAboutKeyInformation(obj)
-				log.Printf("Delete %s %s %s\n", u.Namespace, u.Kind, u.Name)
+				log.Infoln("Record Delete Events -  %s %s %s\n", u.Namespace, u.Kind, u.Name)
 				asyncQueue.Add(u)
 			},
 		})
@@ -201,33 +203,33 @@ func interfaceToYAML(obj interface{}) ([]byte, error) {
 	*/
 	var rawData map[string]interface{}
 	if err = yaml.Unmarshal(yamlData, &rawData); err != nil {
-		log.Printf("Error unmarshalling data: %v", err)
+		log.Warnf("Error unmarshalling data: %v", err)
 		return yamlData, nil
 	}
 
 	if obj, exists := rawData["object"]; exists {
 		objData, err := yaml.Marshal(obj)
 		if err != nil {
-			log.Printf("Error marshalling object data: %v", err)
+			log.Warnf("Error marshalling object data: %v", err)
 			return yamlData, nil
 		}
 		return objData, nil
 	}
 
-	log.Println("'object' field does not exist in the data")
+	log.Infoln("'object' field does not exist in the data")
 	return yamlData, nil
 }
 
 func ExtractAboutKeyInformation(obj interface{}) *config.QueueItem {
 	unstructuredObj, ok := obj.(*unstructured.Unstructured)
 	if !ok {
-		log.Printf("Invalid object type, expected *unstructured.Unstructured, got %T", obj)
+		log.Warnf("Invalid object type, expected *unstructured.Unstructured, got %T", obj)
 		return nil
 	}
 
 	yamlContent, err := interfaceToYAML(obj)
 	if err != nil {
-		log.Printf("Error converting object to YAML: %v", err)
+		log.Warnf("Error converting object to YAML: %v", err)
 		return nil
 	}
 

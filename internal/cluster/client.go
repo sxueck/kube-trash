@@ -2,7 +2,8 @@ package cluster
 
 import (
 	"fmt"
-	"log"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/sxueck/kube-trash/config"
 	"github.com/sxueck/kube-trash/pkg/utils"
@@ -81,7 +82,7 @@ func NewClientConfig() (*rest.Config, error) {
 	} else {
 		restConfig, err = rest.InClusterConfig()
 		if err != nil {
-			log.Printf("Failed to get in-cluster config: %v", err)
+			log.Errorf("Failed to get in-cluster config: %v", err)
 			return nil, err
 		}
 	}

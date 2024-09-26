@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -37,7 +38,7 @@ func (s *S3Storage) Upload(ctx context.Context, objectName string, reader io.Rea
 		return fmt.Errorf("failed to upload object: %v", err)
 	}
 
-	log.Printf("Successfully uploaded %s of size %d\n", objectName, objectSize)
+	log.Infof("Successfully uploaded %s of size %d\n", objectName, objectSize)
 	return nil
 }
 
@@ -56,6 +57,6 @@ func (s *S3Storage) Delete(ctx context.Context, objectName string) error {
 		return fmt.Errorf("failed to delete object: %v", err)
 	}
 
-	log.Printf("Successfully deleted object: %s\n", objectName)
+	log.Infof("Successfully deleted object: %s\n", objectName)
 	return nil
 }

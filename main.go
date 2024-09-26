@@ -105,32 +105,32 @@ func processQueue(ctx context.Context, q workqueue.RateLimitingInterface, s3 *st
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Shutting down the queue due to context cancellation")
+			log.Infoln("Shutting down the queue due to context cancellation")
 			return
 		default:
 			element, shutdown := q.Get()
 			if shutdown {
-				log.Println("Shutting down the queue")
+				log.Infoln("Shutting down the queue")
 				return
 			}
 
 			item, ok := element.(*config.QueueItem)
 			if !ok {
-				log.Printf("Invalid element type, expected config.QueueItem, got %T", element)
+				log.Infof("Invalid element type, expected config.QueueItem, got %T", element)
 				q.Done(element)
 				continue
 			}
 			// Use s3 to store files
-			log.Printf("Processing item: %+v", item.Name)
+			log.Infof("Processing item: %+v", item.Name)
 			objectName := GenMinioCompleteObjectName(item.Namespace, item.Name, item.Kind)
 			err := s3.Upload(ctx,
 				objectName,
 				bytes.NewReader(item.Data),
 				int64(len(item.Data)))
 			if err != nil {
-				log.Printf("Error uploading to storage: %v", err)
+				log.Errorf("Error uploading to storage: %v", err)
 			} else {
-				log.Printf("Successfully uploaded %s to storage", objectName)
+				log.Infof("Successfully uploaded %s to storage", objectName)
 			}
 		}
 	}
