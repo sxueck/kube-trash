@@ -59,8 +59,3 @@ func InitConfig() {
 	GlobalCfg.KubeConfig = os.Getenv("KR_KUBECONFIG")
 	fmt.Printf("%+v\n", GlobalCfg)
 }
-
-func init() {
-	InitConfig()
-	log.Printf("%+v\n", GlobalCfg)
-}

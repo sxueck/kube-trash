@@ -2,10 +2,11 @@ package cluster
 
 import (
 	"fmt"
+	"log"
+
 	"github.com/sxueck/kube-trash/config"
 	"github.com/sxueck/kube-trash/pkg/utils"
 	"k8s.io/client-go/discovery"
-	"log"
 
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -46,16 +47,16 @@ func NewClientConfig() (*rest.Config, error) {
 		}
 
 		// extract the apiServer address from the kubeConfig file
-		config, err := clientcmd.LoadFromFile(kubeConfigPath)
+		cfg, err := clientcmd.LoadFromFile(kubeConfigPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load kubeconfig: %v", err)
 		}
 
-		if len(config.Clusters) == 0 {
+		if len(cfg.Clusters) == 0 {
 			return nil, fmt.Errorf("no clusters defined in kubeconfig")
 		}
 
-		for _, cluster := range config.Clusters {
+		for _, cluster := range cfg.Clusters {
 			apiServer = cluster.Server
 			break
 		}

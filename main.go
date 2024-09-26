@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"time"
@@ -15,26 +14,40 @@ import (
 	"github.com/sxueck/kube-trash/pkg/storage"
 	"golang.org/x/sys/unix"
 	"k8s.io/client-go/util/workqueue"
+
+	log "github.com/sirupsen/logrus"
 )
+
+func init() {
+	config.InitConfig()
+	config.InitLogComponent()
+	log.Debugf("%+v\n", config.GlobalCfg)
+}
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	sigterm := make(chan os.Signal, 1)
 	signal.Notify(sigterm, unix.SIGQUIT, unix.SIGTERM, unix.SIGINT)
 
-	if err := Run(ctx); err != nil {
-		log.Printf("error running program: %v", err)
-		cancel()
-	}
+	go func() {
+		if err := Run(ctx); err != nil {
+			log.Warnf("error running program: %v", err)
+			cancel()
+		}
+	}()
 
 	select {
 	case <-sigterm:
-		log.Println("stop and clean all processes")
+		log.Infoln("Received termination signal. Stopping and cleaning all processes...")
 		cancel()
 	case <-ctx.Done():
+		log.Infoln("Context canceled. Exiting...")
 	}
 
-	<-time.NewTicker(1 * time.Second).C
+	time.Sleep(1 * time.Second)
+	log.Infoln("Program exited.")
 }
 
 func Run(ctx context.Context) error {
