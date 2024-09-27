@@ -88,7 +88,7 @@ func ServResourcesInformer(client cluster.ClientSet, asyncQueue workqueue.RateLi
 }
 
 // runInformer Runs informer for the specified resource
-// Here you need to pass in a queue for asynchronous processing, to avoid the process of blocking the cluster due to i/o problems
+// Here we need to pass in a queue for asynchronous processing, to avoid the process of blocking the cluster due to i/o problems
 func runInformer(ctx context.Context, dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, asyncQueue workqueue.RateLimitingInterface) error {
 	defer func() {
 		if r := recover(); r != nil {
@@ -105,7 +105,7 @@ func runInformer(ctx context.Context, dynamicClient dynamic.Interface, gvr schem
 		_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 			DeleteFunc: func(obj interface{}) {
 				u := ExtractAboutKeyInformation(obj)
-				log.Infoln("Record Delete Events -  %s %s %s\n", u.Namespace, u.Kind, u.Name)
+				log.Infof("Record Delete Events -  %s %s %s\n", u.Namespace, u.Kind, u.Name)
 				asyncQueue.Add(u)
 			},
 		})
@@ -116,7 +116,17 @@ func runInformer(ctx context.Context, dynamicClient dynamic.Interface, gvr schem
 		return fmt.Errorf("failed to create informer for %s after retries: %w", gvr.String(), err)
 	}
 
-	informer.Run(ctx.Done())
+	go informer.Run(ctx.Done())
+
+	// Add a timeout for cache synchronization
+	syncCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	if !cache.WaitForCacheSync(syncCtx.Done(), informer.HasSynced) {
+		log.Warnf("Failed to sync cache for %s, continuing without full synchronization", gvr.String())
+	}
+
+	<-ctx.Done()
 	return nil
 }
 

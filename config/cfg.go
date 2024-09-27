@@ -16,8 +16,7 @@ type QueueItem struct {
 }
 
 type Cfg struct {
-	APIServer  string   `mapstructure:"api_server"`
-	KubeConfig string   `mapstructure:"kube_config"`
+	KubeConfig string
 	Storage    S3Config `mapstructure:"storage"`
 	Watch      Watch    `mapstructure:"watch"`
 }

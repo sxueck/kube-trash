@@ -6,7 +6,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/sxueck/kube-trash/config"
-	"github.com/sxueck/kube-trash/pkg/utils"
 	"k8s.io/client-go/discovery"
 
 	"k8s.io/client-go/dynamic"
@@ -39,14 +38,10 @@ func NewClientConfig() (*rest.Config, error) {
 		err        error
 	)
 
-	apiServer := config.GlobalCfg.APIServer
 	kubeConfigPath := config.GlobalCfg.KubeConfig
+	var apiServer string
 
-	if len(apiServer) == 0 && len(kubeConfigPath) > 0 {
-		if err = utils.FileExistsAndReadable(kubeConfigPath); err != nil {
-			return nil, err
-		}
-
+	if len(kubeConfigPath) > 0 {
 		// extract the apiServer address from the kubeConfig file
 		cfg, err := clientcmd.LoadFromFile(kubeConfigPath)
 		if err != nil {
@@ -69,10 +64,6 @@ func NewClientConfig() (*rest.Config, error) {
 		fmt.Printf("Using API server: %s\n", apiServer)
 		if len(kubeConfigPath) == 0 {
 			return nil, fmt.Errorf("KubeConfig is not set")
-		} else {
-			if err = utils.FileExistsAndReadable(kubeConfigPath); err != nil {
-				return nil, err
-			}
 		}
 
 		restConfig, err = clientcmd.BuildConfigFromFlags(apiServer, kubeConfigPath)
@@ -80,6 +71,7 @@ func NewClientConfig() (*rest.Config, error) {
 			return nil, err
 		}
 	} else {
+		log.Infoln("Using in-cluster configuration")
 		restConfig, err = rest.InClusterConfig()
 		if err != nil {
 			log.Errorf("Failed to get in-cluster config: %v", err)

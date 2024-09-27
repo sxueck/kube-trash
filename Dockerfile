@@ -20,8 +20,5 @@ RUN apk add --no-cache tzdata ca-certificates && \
     rm -rf /var/cache/apk/*
 
 COPY --from=builder /go/bin/trash /trash
-COPY config.yaml /config.yaml
-
-ENV KR_KUBECONFIG="/root/kubeconfig"
 
 CMD ["/trash"]
