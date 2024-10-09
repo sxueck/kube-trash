@@ -26,15 +26,11 @@ import (
 
 const (
 	informerReSyncPeriod   = time.Minute
-	informerTimeout        = 5 * time.Minute
 	ListenerMaxConcurrency = 20 // The maximum number of concurrent listeners
 )
 
 // ServResourcesInformer Reduce the impact on API servers by controlling the number of concurrent queries
-func ServResourcesInformer(client cluster.ClientSet, asyncQueue workqueue.RateLimitingInterface) error {
-	ctx, cancel := context.WithTimeout(context.Background(), informerTimeout)
-	defer cancel()
-
+func ServResourcesInformer(ctx context.Context, client cluster.ClientSet, asyncQueue workqueue.RateLimitingInterface) error {
 	// Gets a list of resources supported by the server
 	resourceList, err := client.BaseClient.Discovery().ServerPreferredResources()
 	if err != nil {
@@ -74,9 +70,9 @@ func ServResourcesInformer(client cluster.ClientSet, asyncQueue workqueue.RateLi
 				semaphore <- struct{}{}        // Acquire semaphore
 				defer func() { <-semaphore }() // Release semaphore
 
-				if err := runInformer(ctx, client.DynamicClient, gvr, asyncQueue); err != nil {
-					if !errors.IsNotFound(err) {
-						log.Warnf("Error running informer for %s: %v", gvr.String(), err)
+				if queueErr := runInformer(ctx, client.DynamicClient, gvr, asyncQueue); queueErr != nil {
+					if !errors.IsNotFound(queueErr) {
+						log.Warnf("Error running informer for %s: %v", gvr.String(), queueErr)
 					}
 				}
 			}(gvr)
@@ -90,12 +86,6 @@ func ServResourcesInformer(client cluster.ClientSet, asyncQueue workqueue.RateLi
 // runInformer Runs informer for the specified resource
 // Here we need to pass in a queue for asynchronous processing, to avoid the process of blocking the cluster due to i/o problems
 func runInformer(ctx context.Context, dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, asyncQueue workqueue.RateLimitingInterface) error {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Warnf("Recovered from panic in informer for %s: %v", gvr.String(), r)
-		}
-	}()
-
 	var informer cache.SharedIndexInformer
 	err := retry.OnError(retry.DefaultRetry, func(err error) bool {
 		_, isNotFound := err.(*errors.StatusError)
@@ -119,14 +109,16 @@ func runInformer(ctx context.Context, dynamicClient dynamic.Interface, gvr schem
 	go informer.Run(ctx.Done())
 
 	// Add a timeout for cache synchronization
-	syncCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	syncCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
 	if !cache.WaitForCacheSync(syncCtx.Done(), informer.HasSynced) {
 		log.Warnf("Failed to sync cache for %s, continuing without full synchronization", gvr.String())
+		log.Warnf("Detailed cache sync failure for %s: %v", gvr.String(), syncCtx.Err())
 	}
 
-	<-ctx.Done()
+	//<-ctx.Done()
+	//log.Infof("Context done, stopping informer for %s", gvr.String())
 	return nil
 }
 

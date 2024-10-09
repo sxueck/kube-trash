@@ -46,7 +46,7 @@ func main() {
 		log.Infoln("Context canceled. Exiting...")
 	}
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(3 * time.Second)
 	log.Infoln("Program exited.")
 }
 
@@ -79,7 +79,7 @@ func Run(ctx context.Context) error {
 
 	// Start Resource Monitoring
 	go func(errChan chan<- error) {
-		err = internal.ServResourcesInformer(cluster.ClientSet{
+		err = internal.ServResourcesInformer(ctx, cluster.ClientSet{
 			BaseClient:      clientSet,
 			DiscoveryClient: discoveryClient,
 			DynamicClient:   dynamicClient,
